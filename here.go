@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/juju/loggo"
@@ -13,6 +14,7 @@ import (
 
 var haveSetLogLevel bool
 var logger = loggo.GetLogger("here")
+var indentLevel = 0
 
 // Here prints just enough stack trace to find where it was called from
 func Here() {
@@ -25,18 +27,21 @@ type formatter struct{}
 // line which are separated by a colon.  The timestamp is shown to second
 // resolution in UTC.
 func (*formatter) Format(level loggo.Level, module, filename string, line int, timestamp time.Time, message string) string {
-	return fmt.Sprintf("%s", message)
+	return message
 }
 
-func write(line string) {
+func write(message string) {
 	if haveSetLogLevel == false {
-
 		logger.SetLogLevel(loggo.INFO)
 		haveSetLogLevel = true
 	}
-	logger.Infof(line)
+	prefix := "| "
+	f := fmt.Sprintf("### %%%ds%%s", indentLevel+len(prefix))
+	m := fmt.Sprintf(f, prefix, message)
+	logger.Infof(m)
 }
 
+// OverwriteWriter replaces the default writer with the above here.formatter
 func OverwriteWriter() {
 	loggo.RemoveWriter("default")
 	w := loggo.NewSimpleWriter(os.Stdout, &formatter{})
@@ -62,12 +67,28 @@ func here() {
 // Is prints the value of v with just enough stack trace to find where it was called from
 func Is(v interface{}) {
 	here()
-	write(pretty.Sprintf("\t---> %# v\n", v))
+	lines := strings.Split(pretty.Sprintf("---> %# v\n", v), "\n")
+	for _, line := range lines {
+		write(line)
+	}
 }
 
-// V prints the value of v
+// V prints the value of v, prefixed by a name
 func V(name string, v interface{}) {
-	write(pretty.Sprintf("%s: %# v\n", name, v))
+	lines := strings.Split(pretty.Sprintf("%s: %# v\n", name, v), "\n")
+	for _, line := range lines {
+		write(line)
+	}
+}
+
+// M prints the string s
+func M(s string) {
+	write(s)
+}
+
+// HR prints s in the middle of a horizontal line
+func HR(s string) {
+	write("---------------- " + s + " ----------------")
 }
 
 // Stack prints a full stack trace
@@ -87,4 +108,15 @@ func Stack() {
 		}
 	}
 	write("<<<<<<<<<<<<<")
+}
+
+func Indent() {
+	indentLevel += 2
+}
+
+func Dedent() {
+	indentLevel -= 2
+	if indentLevel < 0 {
+		indentLevel = 0
+	}
 }
