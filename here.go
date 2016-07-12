@@ -30,11 +30,37 @@ func (*formatter) Format(level loggo.Level, module, filename string, line int, t
 	return message
 }
 
-func write(message string) {
-	if haveSetLogLevel == false {
-		logger.SetLogLevel(loggo.INFO)
-		haveSetLogLevel = true
+// prefixSize is used internally to trim the user specific path from the
+// front of the returned filenames from the runtime call stack.
+var prefixSize int
+
+// goPath is the deduced path based on the location of this file as compiled.
+var goPath string
+
+func init() {
+	_, file, _, ok := runtime.Caller(0)
+	if ok {
+		// We know that the end of the file should be:
+		// github.com/juju/errors/path.go
+		size := len(file)
+		suffix := len("github.com/juju/errors/path.go")
+		goPath = file[:size-suffix]
+		prefixSize = len(goPath)
 	}
+}
+
+func trimGoPath(filename string) string {
+	if strings.HasPrefix(filename, goPath) {
+		return filename[prefixSize:]
+	}
+	return filename
+}
+
+func write(message string) {
+	//if haveSetLogLevel == false {
+		logger.SetLogLevel(loggo.INFO)
+	//	haveSetLogLevel = true
+	//}
 	prefix := "| "
 	f := fmt.Sprintf("### %%%ds%%s", indentLevel+len(prefix))
 	m := fmt.Sprintf(f, prefix, message)
@@ -62,6 +88,11 @@ func here() {
 			write(line)
 		}
 	}
+}
+
+func Loc() string {
+	_, file, line, _ := runtime.Caller(1)
+	return fmt.Sprintf("%s:%d", trimGoPath(file), line)
 }
 
 // Is prints the value of v with just enough stack trace to find where it was called from
