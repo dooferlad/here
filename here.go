@@ -6,7 +6,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/juju/loggo"
 	"github.com/kr/pretty"
@@ -21,13 +20,9 @@ func Here() {
 	here()
 }
 
-type formatter struct{}
-
-// Format returns the parameters separated by spaces except for filename and
-// line which are separated by a colon.  The timestamp is shown to second
-// resolution in UTC.
-func (*formatter) Format(level loggo.Level, module, filename string, line int, timestamp time.Time, message string) string {
-	return message
+// Uncluttered formatter
+func Formatter(entry loggo.Entry) string {
+	return entry.Message
 }
 
 // prefixSize is used internally to trim the user specific path from the
@@ -58,7 +53,7 @@ func trimGoPath(filename string) string {
 
 func write(message string) {
 	//if haveSetLogLevel == false {
-		logger.SetLogLevel(loggo.INFO)
+	logger.SetLogLevel(loggo.INFO)
 	//	haveSetLogLevel = true
 	//}
 	prefix := "| "
@@ -70,8 +65,8 @@ func write(message string) {
 // OverwriteWriter replaces the default writer with the above here.formatter
 func OverwriteWriter() {
 	loggo.RemoveWriter("default")
-	w := loggo.NewSimpleWriter(os.Stdout, &formatter{})
-	loggo.RegisterWriter("default", w, loggo.INFO)
+	w := loggo.NewSimpleWriter(os.Stdout, Formatter)
+	loggo.RegisterWriter("default", w)
 }
 
 func here() {
@@ -96,11 +91,13 @@ func Loc() string {
 }
 
 // Is prints the value of v with just enough stack trace to find where it was called from
-func Is(v interface{}) {
+func Is(vars ...interface{}) {
 	here()
-	lines := strings.Split(pretty.Sprintf("---> %# v\n", v), "\n")
-	for _, line := range lines {
-		write(line)
+	for _, v := range(vars) {
+		lines := strings.Split(pretty.Sprintf("---> %# v\n", v), "\n")
+		for _, line := range lines {
+			write(line)
+		}
 	}
 }
 
@@ -113,8 +110,10 @@ func V(name string, v interface{}) {
 }
 
 // M prints the string s
-func M(s string) {
-	write(s)
+func M(s ...string) {
+	for _, m := range(s) {
+		write(m)
+	}
 }
 
 // HR prints s in the middle of a horizontal line
